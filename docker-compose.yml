@@ -1,0 +1,65 @@
+version: '3.5'
+
+networks:
+  localdev:
+    name: localdev
+
+services:
+  sqldata:
+    image: mcr.microsoft.com/mssql/server:2019-latest 
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Jinna@1988
+      - MSSQL_TCP_PORT=1433
+    ports:
+      - "15090:1433"
+
+  basketdata:
+    image: redis:latest
+    ports:
+      - "15094:6379"
+    networks:
+      - localdev
+  
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5673:5673"
+      - "15555:15555"
+    container_name: rabbitmq
+    hostname: my-rabbit
+    networks:
+      - localdev
+
+  catalog-api:
+    image: ${DOCKER_REGISTRY:-eshop}/catalog.api:${PLATFORM:-linux}-${TAG:-latest}
+    build:
+      context: .
+      dockerfile: Catalog.API/Dockerfile
+    restart: always
+    ports:
+      - "15091:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    depends_on:
+      - sqldata
+      - rabbitmq
+    networks:
+      - localdev
+
+  basket.api:
+    image: ${DOCKER_REGISTRY:-eshop}/basket.api:${PLATFORM:-linux}-${TAG:-latest}
+    build:
+      context: .
+      dockerfile: Basket.API/Dockerfile
+    restart: always
+    ports:
+      - "15092:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    depends_on:
+      - basketdata
+      - catalog-api
+      - rabbitmq
+    networks:
+      - localdev
